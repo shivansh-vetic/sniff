@@ -6,8 +6,9 @@ Wires the parts together and runs the HTTP server:
     auth    → Google OAuth provider
     backends → mount Postgres + Mongo MCP servers
 
-Run:
+Run (either works):
     python server.py
+    uvicorn server:app
 """
 
 from fastmcp import FastMCP
@@ -24,8 +25,13 @@ def build_gateway() -> tuple[FastMCP, config.Settings]:
     return gateway, settings
 
 
+# Build once at import so uvicorn (and any other ASGI server) can serve it:
+#     uvicorn server:app --host 0.0.0.0 --port 8080
+gateway, settings = build_gateway()
+app = gateway.http_app()
+
+
 def main() -> None:
-    gateway, settings = build_gateway()
     gateway.run(transport="http", port=settings.port)
 
 

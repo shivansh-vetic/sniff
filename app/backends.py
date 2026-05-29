@@ -5,9 +5,9 @@ Each backend MCP server runs as a stdio child process spawned by FastMCP via
 
 Backends used:
     Postgres → `@modelcontextprotocol/server-postgres` (npm, Anthropic official)
-    Mongo    → `mcp-mongo-server`                       (npm, current MCP spec)
+    Mongo    → `mongodb-mcp-server`                     (npm, MongoDB official)
 
-Mongo runs with `--read-only` so the LLM can never INSERT/UPDATE/DELETE.
+Mongo runs with `--readOnly` so the LLM can never INSERT/UPDATE/DELETE.
 
 Requires Node + npx on the host:
     sudo apt -y install nodejs npm    # Ubuntu
@@ -37,11 +37,13 @@ def mount_postgres(gateway: FastMCP, db: PostgresDB) -> None:
 
 
 def mount_mongo(gateway: FastMCP, mongo_url: str) -> None:
+    # Official MongoDB MCP server expects --connectionString (not a positional arg)
+    # and --readOnly (camelCase, not kebab-case).
     gateway.mount(
         create_proxy(
             NpxStdioTransport(
-                package="mcp-mongo-server",
-                args=[mongo_url, "--read-only"],
+                package="mongodb-mcp-server@latest",
+                args=["--connectionString", mongo_url, "--readOnly"],
             )
         ),
         namespace="mongo",

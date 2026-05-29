@@ -47,12 +47,12 @@ https://mcp.vetic.in/mcp                  ← public, only entry point
        ▼
 FastMCP gateway (server.py)
        │
-       ├─► npx @modelcontextprotocol/server-postgres   (stdio child, namespace "pg")
+       ├─► npx @modelcontextprotocol/server-postgres   (stdio child, namespace "pg_<dbname>")
        └─► npx mongo-mcp                                (stdio child, namespace "mongo")
 ```
 
-The child MCP servers are spawned by the gateway. They are not reachable from
-outside. Only the FastMCP gateway is exposed.
+The child MCP servers are spawned by the gateway via `npx`. They are not
+reachable from outside. Only the FastMCP gateway is exposed.
 
 ---
 
@@ -66,13 +66,14 @@ source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
-Also install Node (for `npx`, which spawns the registry MCP servers):
+Also install Node + npx — the gateway spawns the Postgres/Mongo MCP servers
+via npx:
 
 ```bash
-# macOS
-brew install node
 # Ubuntu
 sudo apt -y install nodejs npm
+# macOS
+brew install node
 ```
 
 ### 2. Create a Google OAuth client
@@ -181,5 +182,6 @@ rewrite. The auth + fan-out wiring is already in place.
 | Google says "this app isn't verified" | OAuth consent screen is set to External. Switch to **Internal** so only Workspace users can sign in. |
 | `npx: command not found` from FastMCP | Node not installed on the host. `node -v` should print v18+. |
 | `Import "fastmcp" could not be resolved` (Pylance) | `pip install -r requirements.txt` not run. Activate the venv too. |
-| Mongo proxy errors on startup | `mongo-mcp` npm package name varies. Try `mcp-mongo-server` or whichever the npm registry has. Update `package=` in `server.py`. |
+| Mongo proxy errors on startup | `mongo-mcp` npm package name varies. Try `mcp-mongo-server` or whichever is current on npm and update `package=` in `app/backends.py`. |
+| Mongo warning `Invalid arguments for tool 'mongo_listCollections'` | `mongo-mcp` returns a slightly off-spec response shape; the call still succeeds. Harmless log noise. |
 | Claude can connect but tool returns 401 | Token expired (1h default). Re-trigger the OAuth flow by removing and re-adding the connector in Claude. |

@@ -1,7 +1,17 @@
 """Mounts the registry MCP servers (Postgres × N, Mongo) onto the gateway.
 
-Each backend MCP server runs as a stdio child process spawned by FastMCP.
-They are not reachable from outside — only the gateway is exposed.
+Each backend MCP server runs as a stdio child process spawned by FastMCP via
+`npx`. They are not reachable from outside — only the gateway is exposed.
+
+Backends used:
+    Postgres → `@modelcontextprotocol/server-postgres` (npm, Anthropic official)
+    Mongo    → `mcp-mongo-server`                       (npm, current MCP spec)
+
+Mongo runs with `--read-only` so the LLM can never INSERT/UPDATE/DELETE.
+
+Requires Node + npx on the host:
+    sudo apt -y install nodejs npm    # Ubuntu
+    brew install node                  # macOS
 
 Tools from each backend are auto-prefixed with the namespace, e.g.
 `pg_vetic_query`, `pg_analytics_query`, `mongo_find`.
@@ -30,8 +40,8 @@ def mount_mongo(gateway: FastMCP, mongo_url: str) -> None:
     gateway.mount(
         create_proxy(
             NpxStdioTransport(
-                package="mongo-mcp",
-                args=[mongo_url],
+                package="mcp-mongo-server",
+                args=[mongo_url, "--read-only"],
             )
         ),
         namespace="mongo",

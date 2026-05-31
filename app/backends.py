@@ -8,13 +8,6 @@ Backends used:
     Mongo    → `mongodb-mcp-server`                     (npm, MongoDB official)
 
 Mongo runs with `--readOnly` so the LLM can never INSERT/UPDATE/DELETE.
-
-Requires Node + npx on the host:
-    sudo apt -y install nodejs npm    # Ubuntu
-    brew install node                  # macOS
-
-Tools from each backend are auto-prefixed with the namespace, e.g.
-`pg_vetic_query`, `pg_analytics_query`, `mongo_find`.
 """
 
 import logging
@@ -26,6 +19,7 @@ from fastmcp.server import create_proxy
 from .config import PostgresDB, Settings
 
 logger = logging.getLogger(__name__)
+_MONGO_NPX_CACHE_DIR = "/tmp/mongodb-mcp-server-npx-cache-v2"
 
 
 class NonInteractiveNpxStdioTransport(NpxStdioTransport):
@@ -34,6 +28,19 @@ class NonInteractiveNpxStdioTransport(NpxStdioTransport):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.args = ["--yes", *self.args]
+
+
+def mongo_child_env(mongo_url: str) -> dict[str, str]:
+    return {
+        "MDB_MCP_CONNECTION_STRING": mongo_url,
+        "NPM_CONFIG_CACHE": _MONGO_NPX_CACHE_DIR,
+        "npm_config_cache": _MONGO_NPX_CACHE_DIR,
+        # Avoid host crashes from optional native modules like kerberos.
+        "NPM_CONFIG_OMIT": "optional",
+        "npm_config_omit": "optional",
+        "NPM_CONFIG_OPTIONAL": "false",
+        "npm_config_optional": "false",
+    }
 
 
 def mount_postgres(gateway: FastMCP, db: PostgresDB, package: str) -> None:
@@ -48,14 +55,13 @@ def mount_postgres(gateway: FastMCP, db: PostgresDB, package: str) -> None:
     )
 
 
-def mount_mongo(gateway: FastMCP, mongo_url: str, package: str) -> None:
-    # Prefer the environment variable over the deprecated --connectionString flag.
+def mount_mongo(gateway: FastMCP, settings: Settings, mongo_url: str) -> None:
     gateway.mount(
         create_proxy(
             NonInteractiveNpxStdioTransport(
-                package=package,
+                package=settings.mongo_mcp_package,
                 args=["--readOnly"],
-                env_vars={"MDB_MCP_CONNECTION_STRING": mongo_url},
+                env_vars=mongo_child_env(mongo_url),
             )
         ),
         namespace="mongo",
@@ -70,11 +76,13 @@ def mount_all(gateway: FastMCP, settings: Settings) -> None:
             settings.postgres_mcp_package,
         )
         mount_postgres(gateway, db, settings.postgres_mcp_package)
+
     if settings.mongo_url:
         logger.info(
-            "Mounting Mongo backend namespace=mongo package=%s",
+            "Mounting Mongo backend namespace=mongo package=%s cache=%s",
             settings.mongo_mcp_package,
+            _MONGO_NPX_CACHE_DIR,
         )
-        mount_mongo(gateway, settings.mongo_url, settings.mongo_mcp_package)
+        mount_mongo(gateway, settings, settings.mongo_url)
     else:
         logger.warning("Skipping Mongo backend because MONGO_URL is not set")

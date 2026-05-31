@@ -80,7 +80,6 @@ def _discover_postgres_dbs() -> list[PostgresDB]:
     """
     dbs: list[PostgresDB] = []
 
-    # Pattern 1: named DBs
     names = sorted(
         m.group("name")
         for key in os.environ
@@ -98,7 +97,6 @@ def _discover_postgres_dbs() -> list[PostgresDB]:
             )
         )
 
-    # Pattern 2: single unnamed DB
     if "POSTGRES_HOST" in os.environ:
         dbs.append(
             PostgresDB(
@@ -128,6 +126,6 @@ def load() -> Settings:
         ),
         mongo_mcp_package=os.environ.get(
             "MONGO_MCP_PACKAGE",
-            "mongodb-mcp-server@latest",
+            "mongodb-mcp-server@1.11.0",
         ),
     )

@@ -13,7 +13,7 @@ import shutil
 
 from fastmcp.client import Client
 
-from app.backends import NonInteractiveNpxStdioTransport
+from app.backends import NonInteractiveNpxStdioTransport, mongo_child_env
 from app.config import PostgresDB, Settings, load
 
 TIMEOUT_SECONDS = 60
@@ -70,7 +70,7 @@ async def _check_mongo(settings: Settings) -> bool:
             _list_tools(
                 settings.mongo_mcp_package,
                 ["--readOnly"],
-                {"MDB_MCP_CONNECTION_STRING": settings.mongo_url},
+                mongo_child_env(settings.mongo_url),
             ),
             timeout=TIMEOUT_SECONDS,
         )

@@ -61,6 +61,8 @@ class Settings:
 
     postgres_dbs: list[PostgresDB]
     mongo_url: str | None
+    postgres_mcp_package: str
+    mongo_mcp_package: str
 
 
 _POSTGRES_HOST_PATTERN = re.compile(r"^POSTGRES_(?P<name>.+)_HOST$")
@@ -120,4 +122,12 @@ def load() -> Settings:
         google_client_secret=_require("GOOGLE_CLIENT_SECRET"),
         postgres_dbs=_discover_postgres_dbs(),
         mongo_url=os.environ.get("MONGO_URL"),
+        postgres_mcp_package=os.environ.get(
+            "POSTGRES_MCP_PACKAGE",
+            "@modelcontextprotocol/server-postgres",
+        ),
+        mongo_mcp_package=os.environ.get(
+            "MONGO_MCP_PACKAGE",
+            "mongodb-mcp-server@latest",
+        ),
     )

@@ -48,10 +48,10 @@ https://mcp.vetic.in/mcp                  ← public, only entry point
 FastMCP gateway (server.py)
        │
        ├─► npx @modelcontextprotocol/server-postgres   (stdio child, namespace "pg_<dbname>")
-       └─► npx mongo-mcp                                (stdio child, namespace "mongo")
+       └─► npx mongodb-mcp-server                       (stdio child, namespace "mongo")
 ```
 
-The child MCP servers are spawned by the gateway via `npx`. They are not
+The child MCP servers are spawned by the gateway via `npx --yes`. They are not
 reachable from outside. Only the FastMCP gateway is exposed.
 
 ---
@@ -104,6 +104,12 @@ python server.py
 Should print:
 ```
 FastMCP server running on http://0.0.0.0:8080
+```
+
+To verify child backends on any host:
+
+```bash
+.venv/bin/python diagnose_backends.py
 ```
 
 ### 5. Connect from Claude
@@ -181,7 +187,8 @@ rewrite. The auth + fan-out wiring is already in place.
 | Google says `redirect_uri_mismatch` | The redirect URI in Google Console must exactly match `http://localhost:8080/auth/callback` (or your prod equivalent). Trailing slashes count. |
 | Google says "this app isn't verified" | OAuth consent screen is set to External. Switch to **Internal** so only Workspace users can sign in. |
 | `npx: command not found` from FastMCP | Node not installed on the host. `node -v` should print v18+. |
+| Mongo tools missing but Postgres tools exist | Run `.venv/bin/python diagnose_backends.py` on the host. Most common causes are missing `MONGO_URL`, the EC2 instance not being able to reach Mongo, or `npx` trying to install the Mongo package interactively on first run. |
 | `Import "fastmcp" could not be resolved` (Pylance) | `pip install -r requirements.txt` not run. Activate the venv too. |
-| Mongo proxy errors on startup | `mongo-mcp` npm package name varies. Try `mcp-mongo-server` or whichever is current on npm and update `package=` in `app/backends.py`. |
+| Mongo proxy errors on startup | The Mongo npm package can change over time. Pin `MONGO_MCP_PACKAGE=...` in `.env` if `mongodb-mcp-server@latest` is not the right package/version for your host. |
 | Mongo warning `Invalid arguments for tool 'mongo_listCollections'` | `mongo-mcp` returns a slightly off-spec response shape; the call still succeeds. Harmless log noise. |
 | Claude can connect but tool returns 401 | Token expired (1h default). Re-trigger the OAuth flow by removing and re-adding the connector in Claude. |

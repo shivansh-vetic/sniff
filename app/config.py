@@ -1,27 +1,9 @@
-"""Environment configuration.
-
-All env vars are loaded from `.env` (via python-dotenv) and the process
-environment. `load()` returns a frozen Settings object the rest of the
-package depends on.
-
-Multiple Postgres databases are supported. Add them in `.env` with a
-per-database name prefix:
-
-    POSTGRES_<NAME>_HOST=...
-    POSTGRES_<NAME>_PORT=...        (optional, defaults to 5432)
-    POSTGRES_<NAME>_USER=...
-    POSTGRES_<NAME>_PASSWORD=...
-    POSTGRES_<NAME>_DB=...
-
-Each database appears in Claude as `pg_<name>_query`, etc.
-"""
-
 import os
 import re
-from dataclasses import dataclass
-from urllib.parse import quote_plus
 
 from dotenv import load_dotenv
+
+from .settings import PostgresDB, Settings
 
 load_dotenv()
 
@@ -33,82 +15,43 @@ def _require(name: str) -> str:
     return value
 
 
-@dataclass(frozen=True)
-class PostgresDB:
-    name: str          # lowercased, used as the MCP namespace (pg_<name>_*)
-    host: str
-    port: str
-    user: str
-    password: str
-    db: str
-
-    @property
-    def url(self) -> str:
-        """postgresql:// URL with password URL-encoded."""
-        return (
-            f"postgresql://{quote_plus(self.user)}:{quote_plus(self.password)}"
-            f"@{self.host}:{self.port}/{self.db}"
-        )
-
-
-@dataclass(frozen=True)
-class Settings:
-    base_url: str
-    port: int
-
-    google_client_id: str
-    google_client_secret: str
-
-    postgres_dbs: list[PostgresDB]
-    mongo_url: str | None
-    postgres_mcp_package: str
-    mongo_mcp_package: str
-
-
 _POSTGRES_HOST_PATTERN = re.compile(r"^POSTGRES_(?P<name>.+)_HOST$")
 
 
-def _discover_postgres_dbs() -> list[PostgresDB]:
-    """Walk env vars and assemble PostgresDB list.
-
-    Supports both patterns:
-      1. Named (preferred for multiple DBs):
-           POSTGRES_<NAME>_HOST, POSTGRES_<NAME>_PORT, ...
-      2. Unnamed single DB (for back-compat):
-           POSTGRES_HOST, POSTGRES_PORT, POSTGRES_USER, POSTGRES_PASSWORD, POSTGRES_DB
-         → namespace is derived from POSTGRES_DB.
-    """
-    dbs: list[PostgresDB] = []
-
-    names = sorted(
-        m.group("name")
+def _postgres_names() -> list[str]:
+    return sorted(
+        match.group("name")
         for key in os.environ
-        if (m := _POSTGRES_HOST_PATTERN.match(key))
+        if (match := _POSTGRES_HOST_PATTERN.match(key))
     )
-    for name in names:
-        dbs.append(
-            PostgresDB(
-                name=name.lower(),
-                host=_require(f"POSTGRES_{name}_HOST"),
-                port=os.environ.get(f"POSTGRES_{name}_PORT", "5432"),
-                user=_require(f"POSTGRES_{name}_USER"),
-                password=_require(f"POSTGRES_{name}_PASSWORD"),
-                db=_require(f"POSTGRES_{name}_DB"),
-            )
-        )
 
+
+def _named_postgres_db(name: str) -> PostgresDB:
+    return PostgresDB(
+        name=name.lower(),
+        host=_require(f"POSTGRES_{name}_HOST"),
+        port=os.environ.get(f"POSTGRES_{name}_PORT", "5432"),
+        user=_require(f"POSTGRES_{name}_USER"),
+        password=_require(f"POSTGRES_{name}_PASSWORD"),
+        db=_require(f"POSTGRES_{name}_DB"),
+    )
+
+
+def _default_postgres_db() -> PostgresDB:
+    return PostgresDB(
+        name=_require("POSTGRES_DB").lower(),
+        host=os.environ["POSTGRES_HOST"],
+        port=os.environ.get("POSTGRES_PORT", "5432"),
+        user=_require("POSTGRES_USER"),
+        password=_require("POSTGRES_PASSWORD"),
+        db=_require("POSTGRES_DB"),
+    )
+
+
+def _discover_postgres_dbs() -> list[PostgresDB]:
+    dbs = [_named_postgres_db(name) for name in _postgres_names()]
     if "POSTGRES_HOST" in os.environ:
-        dbs.append(
-            PostgresDB(
-                name=_require("POSTGRES_DB").lower(),
-                host=os.environ["POSTGRES_HOST"],
-                port=os.environ.get("POSTGRES_PORT", "5432"),
-                user=_require("POSTGRES_USER"),
-                password=_require("POSTGRES_PASSWORD"),
-                db=_require("POSTGRES_DB"),
-            )
-        )
-
+        dbs.append(_default_postgres_db())
     return dbs
 
 

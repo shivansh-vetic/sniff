@@ -1,11 +1,3 @@
-"""Backend diagnostic for Postgres and Mongo MCP child servers.
-
-Run this on the target host to verify that the gateway can spawn each child
-server and list its tools:
-
-    .venv/bin/python diagnose_backends.py
-"""
-
 from __future__ import annotations
 
 import asyncio
@@ -13,8 +5,9 @@ import shutil
 
 from fastmcp.client import Client
 
-from app.backends import NonInteractiveNpxStdioTransport, mongo_child_env
-from app.config import PostgresDB, Settings, load
+from app.config import load
+from app.settings import PostgresDB, Settings
+from app.transports import NonInteractiveNpxStdioTransport, mongo_child_env
 
 TIMEOUT_SECONDS = 60
 
